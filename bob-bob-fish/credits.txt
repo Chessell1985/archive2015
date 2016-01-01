@@ -1,0 +1,20 @@
+## BOB BOB FISH ##
+
+Developed by Liam Chessell (liamchessell.com)
+
+Developed for #1GAM April 2015 (www.onegameamonth.com)
+
+Developed using the following:
+
+- pixi.js (Rendering)
+- keydrown.js (Keyboard input)
+- howler.js (Audio handling)
+- Photoshop CS6 (Image editing)
+- www.bfxr.net (Game over sound effect)
+
+With assets taken from the following:
+
+- Youtube creator audio library (background music)
+- cd.textfiles.com ("pop" sound effect)
+
+If you like the game please follow me on twitter! (@DukeToblerone)

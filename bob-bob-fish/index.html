@@ -1,0 +1,852 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+	<title>Bob Bob Fish</title>
+	<style>
+		body {
+			margin: 0px auto;
+			width: 800px;
+			font-family: Verdana;
+			font-size:16px;
+			padding: 0;
+			background-color: #000000;
+		}
+		#game_header {
+			height:30px;
+			line-height:30px;
+			background-color:#007700;
+			border-bottom: 2px solid #004400;
+			color:#ffffff;
+		}
+	</style>
+	<script src="../pixi.js-master/bin/pixi.js"></script>
+	<script src="../pixi.js-master/bin/keydrown.js"></script>
+	<script src="../pixi.js-master/bin/howler.js"></script>
+</head>
+<body>
+	<div id="game_header">
+		<p style="display:inline;margin:0px; margin-left:5px;float:left;">Bob Bob Fish</p>
+		<p style="display:inline;margin:0px; margin-right:5px;float:right;">
+			<a href="credits.txt" style="color:#ffffff;text-decoration:underline;">View Credits</a>
+		</p>
+	</div>
+	<script>
+	
+	// GAME STATE
+	var gameState = {
+		loading      : 0,
+		gameIntro    : 1,
+		gameMenu     : 2,
+		gameStarting : 3,
+		gameRunning  : 4,
+		gameEnding   : 5,
+		gameOver     : 6
+	}
+	
+	var gameCurrentState = gameState.loading;
+	
+	// stop page up/down scrolling with arrow keys
+	var arrow_keys_handler = function(e) {
+    switch(e.keyCode){
+        case 37: case 39: case 38:  case 40: // Arrow keys
+        case 32: e.preventDefault(); break; // Space
+        default: break; // do not block other keys
+    	}
+	};
+	window.addEventListener("keydown", arrow_keys_handler, false);
+	
+	// move x/y
+	var move_x = 0;
+	var move_y = 0;
+	
+	// animation
+	var enemy_frame_timer = 0;
+	var player_frames = 0;
+	var enemy_frame_number = 0;
+	
+	// moving 
+	var moving_x = false;
+	var moving_y = false;
+	
+	// game timer
+	var game_timer_max = 15;
+	var game_time_taken = 0;
+	var game_timer = game_timer_max;
+	var add_enemy_timer = 0;
+	var remove_enemy_timer = 0;
+	var enemy_active = false;
+	var enemy_speed_x = 0;
+	var enemy_speed_y = 0;
+	
+	// constants
+	var decelerate = 0.1;
+	
+	// pressing keys
+	kd.ENTER.press(function () {
+		if(gameCurrentState == gameState.gameMenu) {
+			timer = 0;
+			gameCurrentState = gameState.gameStarting;	
+		} else if(gameCurrentState == gameState.gameOver) {
+			//stage.removeChild(background);
+			stage.removeChild(player);
+			stage.removeChild(enemy);
+			stage.removeChild(timer_text);
+			stage.removeChild(time_bar);
+			stage.removeChild(time_bar_filler);
+			stage.removeChild(flake);
+			stage.removeChild(text1);
+			stage.removeChild(text2);
+			stage.removeChild(text3);
+			player.scale.y = +1;
+			player.scale.x = +1;
+			
+			timer = 0;
+		
+			gameCurrentState = gameState.gameIntro;
+		}
+	});
+	
+	kd.RIGHT.down(function () {
+		if(!kd.LEFT.isDown()) {
+			moving_x = true;
+			move_x += 1;
+			if(move_x > 4) move_x = 4; 
+		}   
+	});
+
+	kd.LEFT.down(function () {
+		if(!kd.RIGHT.isDown()) {
+			moving_x = true;
+			move_x -= 1;
+			if(move_x < -4) move_x = -4; 
+		}   
+	});
+	
+	kd.RIGHT.up(function () {
+		if(!kd.LEFT.isDown()) {
+			moving_x = false; 
+		}   
+	});
+
+	kd.LEFT.up(function () {
+		if(!kd.RIGHT.isDown()) {
+			moving_x = false;
+		}   
+	});
+
+	kd.UP.down(function () {
+		if(!kd.DOWN.isDown()) {
+			moving_y = true;
+			move_y -= 1;
+			if(move_y < -4) move_y = -4;
+		}     
+	});
+
+	kd.DOWN.down( function () {
+		if(!kd.UP.isDown()) {
+			moving_y = true;
+			move_y += 1;
+			if(move_y > 4) move_y = 4; 
+		}    
+	});
+	
+	kd.UP.up(function () {
+		if(!kd.DOWN.isDown()) {
+			moving_y = false;
+		}     
+	});
+
+	kd.DOWN.up( function () {
+		if(!kd.UP.isDown()) {
+			moving_y = false; 
+		}    
+	});
+	
+	// come to rest
+	function check_moving() {
+		if(!moving_x) {
+			if(move_x < 0) {
+				move_x += decelerate;
+				if(move_x > 0) move_x = 0;
+			}
+			if(move_x > 0) {
+				move_x -= decelerate;
+				if(move_x < 0) move_x = 0;
+			}
+		}
+		if(!moving_y) {
+			if(move_y < 1) {
+				move_y += decelerate;
+				if(move_y > 1) move_y = 1;
+			}
+			if(move_y > 1) {
+				move_y -= decelerate;
+				if(move_y < 1) move_y = 1;
+			}
+		}
+	}
+	
+	// drift up
+	function drift_up() {
+		if(!moving_x) {
+			if(move_x < 0) {
+				move_x += decelerate;
+				if(move_x > 0) move_x = 0;
+			}
+			if(move_x > 0) {
+				move_x -= decelerate;
+				if(move_x < 0) move_x = 0;
+			}
+		}
+		if(!moving_y) {
+			if(move_y < -1) {
+				move_y += decelerate;
+				if(move_y > -1) move_y = -1;
+			}
+			if(move_y > -1) {
+				move_y -= decelerate;
+				if(move_y < -1) move_y = -1;
+			}
+		}
+	}
+	
+	function animate_sprites() {
+		frame_timer += 1;
+		
+		// enemy
+		if(enemy.stage) {
+			if(frame_timer % enemy_frame_speed == 0) {
+				enemy_frame_number += 1;
+				if(enemy_frame_number >= enemy_max_frame_number) enemy_frame_number = 0;
+			
+				var x = enemy.x;
+				var y = enemy.y;
+				var xScale = enemy.scale.x;
+			
+				stage.removeChild(enemy);
+				
+				enemy = enemy_frames[enemy_frame_number];
+				
+				enemy.scale.x = xScale;
+				
+				addSprite(enemy,0.5,0.5,x,y,0,0);
+			}
+		}
+		
+		// player
+		if(player.stage && gameCurrentState == gameState.gameRunning) {
+			if(frame_timer % player_frame_speed == 0) {
+				player_frame_number += 1;
+				if(player_frame_number >= player_max_frame_number) player_frame_number = 0;
+			
+				var x = player.x;
+				var y = player.y;
+				var xScale = player.scale.x;
+				var yScale = player.scale.y;
+			
+				stage.removeChild(player);
+				
+				player = player_frames[player_frame_number];
+				
+				player.scale.x = xScale;
+				player.scale.y = yScale;
+				
+				addSprite(player,0.5,0.5,x,y,0,0);
+			}
+		}
+		
+		if(frame_timer >= 60) frame_timer = 0;
+	}
+	
+	// check for wall collisions
+	function check_walls() {
+		var w = player.width / 2;
+		if(w < 0) w *= -1;
+		var h = player.height / 2;
+		if(h < 0) h *= -1;
+	
+		// walls at move_x
+		if(player.x + w + move_x > 800 && move_x > 0) {
+			do {
+				move_x -= decelerate;
+				if(move_x <= 0) {
+					move_x = 0;
+					break;
+				}
+			} while (player.x + w + move_x > 800);
+		}
+		if(player.x - w + move_x < 0 && move_x < 0) {
+			do {
+				move_x += decelerate;
+				if(move_x >= 0) {
+					move_x = 0;
+					break;
+				}
+			} while (player.x - w + move_x < 0);
+		}
+		// walls at move_y
+		if(player.y + h + move_y > 600 && move_y > 0) {
+			do {
+				move_y -= decelerate;
+				if(move_y <= 0) {
+					move_y = 0;
+					break;
+				}
+			} while (player.y + h + move_y > 600);
+		}
+		if(player.y - h + move_y < 0 && move_y < 0) {
+			do {
+				move_y += decelerate;
+				if(move_y >= 0) {
+					move_y = 0;
+					break;
+				}
+			} while (player.y - h + move_y < 0);
+		}
+	}
+	
+	// game timer
+	function check_timer() {
+		timer += 1;
+		time_bar_filler.height = 390 * (((game_timer_max * 60) - timer) / (game_timer_max * 60));
+		if (timer % 60 == 0) {
+			game_time_taken += 1;
+			game_timer -= 1;
+			if(game_timer <= 0) {
+				timer = 0;
+				bgm.stop();
+				die.play();
+				gameCurrentState = gameState.gameEnding;
+			}
+		}
+		timer_text.setText(game_time_taken);
+	}
+	
+	// flake eaten?
+	function check_flake_eaten() {
+		if(spriteCollision(player,flake)) {
+			pop.play();
+			stage.removeChild(flake);
+			game_timer += 2;
+			timer -= 120;
+			
+			player.scale.x *= 1.01;
+			player.scale.y *= 1.01;
+			
+			if(game_timer > game_timer_max) {
+				game_timer = game_timer_max;
+				timer = 0;
+			}
+			
+			do {
+				var x = 100 + Math.floor((Math.random() * 600) + 1);
+				var y =  50 + Math.floor((Math.random() * 500) + 1);
+				addSprite(flake,0.5,0.5,x,y,0,0);
+				if(Math.abs(flake.x - player.x) < 250 && Math.abs(flake.y - player.y) < 250) {
+					stage.removeChild(flake);
+				}
+			} while (!flake.stage);
+			return;
+		}
+		if(spriteCollision(enemy,flake)) {
+			stage.removeChild(flake);
+			
+			do {
+				var x = 100 + Math.floor((Math.random() * 600) + 1);
+				var y =  50 + Math.floor((Math.random() * 500) + 1);
+				addSprite(flake,0.5,0.5,x,y,0,0);
+				if(Math.abs(flake.x - player.x) < 250 && Math.abs(flake.y - player.y) < 250) {
+					stage.removeChild(flake);
+				}
+			} while (!flake.stage);
+			return;
+		}
+	}
+	
+	function check_enemy_collision() {	
+		if(spriteCollision(player,enemy)) {
+			if(player.position.x > enemy.position.x) {
+				move_x = +6;
+			} else {
+				move_x = -6;
+			}
+			if(player.position.y > enemy.position.y) {
+				move_y = +6;
+			} else {
+				move_y = -6;
+			}
+		}
+	}
+	
+	function add_enemy() {
+		if(enemy.stage) return;
+		//
+		var enemyX = 0;
+		var random = Math.random() * 2;
+		if(random <= 1) {
+			enemyX = -100;
+			enemy_speed_x =  3.5;	
+		} else {
+			enemyX =  900;
+			enemy_speed_x = -3.5;
+		}
+		add_enemy_timer += 1;
+		if(add_enemy_timer >= 300) {
+			remove_enemy_timer = 0;
+			addSprite(enemy,0.5,0.5,enemyX,300,0,0);
+		}
+	}
+	
+	function activate_enemy() {
+		if(!enemy.stage) return;
+		if(enemy_active) return;
+		//
+		if(enemy.x >= 0 && enemy.x <= 800) {
+			enemy_active = true;
+		}
+	}
+	
+	function deactivate_enemy() {
+		if(!enemy.stage) return;
+		if(!enemy_active) return;
+		if(gameCurrentState != gameState.gameRunning) {
+			enemy_active = false;
+			return;
+		}
+		//
+		remove_enemy_timer += 1;
+		if(remove_enemy_timer >= 600) {
+			add_enemy_timer = 0;
+			if(enemy.x < 400) {
+				enemy_speed_x = -3.5;
+				enemy_speed_y = 0;
+			} else {
+				enemy_speed_x =  3.5;
+				enemy_speed_y = 0;
+			}
+			enemy_active = false
+		}
+	}
+	
+	function remove_enemy() {
+		if(!enemy.stage) return;
+		if(enemy_active) return;
+		//
+		if(enemy.x < -100 || enemy.x - 100 > 900) {
+			add_enemy_timer = 0;
+			stage.removeChild(enemy);
+		}
+	}
+	
+	function move_enemy() {
+		if(!enemy.stage) return;
+		
+		// temp x speed
+		var temp_speed_x = enemy_speed_x;
+		var temp_speed_y = 3.5;
+			
+		// bools	
+		var in_bounds    = (enemy.x >= 100 && enemy.x <= 700);
+		var found_player = (Math.abs(enemy.x - player.x) < 250 && Math.abs(enemy.y - player.y) < 250);
+		var found_flake  = (Math.abs(enemy.x - flake.x) < 250 && Math.abs(enemy.y - flake.y) < 250);
+		var flake_is_closer = (hyp(Math.abs(enemy.x - flake.x),Math.abs(enemy.y - flake.y)) <
+				   			   hyp(Math.abs(enemy.x - player.x),Math.abs(enemy.y - player.y)));
+				   			   
+		if(in_bounds) {
+			// check to find flake/player
+			if(enemy_active) {
+				if((found_player && found_flake && flake_is_closer) || (found_flake)) {
+					// chase flake
+					if((enemy.x < flake.x && temp_speed_x < 0) || (enemy.x > flake.x && temp_speed_x > 0)) 
+						temp_speed_x *= -1;
+					if((enemy.y < flake.y && temp_speed_y < 0) || (enemy.y > flake.y && temp_speed_y > 0)) 
+						temp_speed_y *= -1;
+					// correct x/y
+					if((enemy.x < flake.x && enemy.x + temp_speed_x > flake.x) || (enemy.x > flake.x && enemy.x + temp_speed_x < flake.x))
+					 	temp_speed_x = 0;
+					if((enemy.y < flake.y && enemy.y + temp_speed_y > flake.y) || (enemy.y > flake.y && enemy.y + temp_speed_y < flake.y))
+					 	temp_speed_y = 0;
+				} else if(found_player) {
+					// chase player
+					if((enemy.x < player.x && temp_speed_x < 0) || (enemy.x > player.x && temp_speed_x > 0)) 
+						temp_speed_x *= -1;
+					if((enemy.y < player.y && temp_speed_y < 0) || (enemy.y > player.y && temp_speed_y > 0)) 
+						temp_speed_y *= -1;
+					// correct x/y
+					if((enemy.x < player.x && enemy.x + temp_speed_x > player.x) || (enemy.x > player.x && enemy.x + temp_speed_x < player.x))
+					 	temp_speed_x = 0;
+					if((enemy.y < player.y && enemy.y + temp_speed_y > player.y) || (enemy.y > player.y && enemy.y + temp_speed_y < player.y))
+					 	temp_speed_y = 0;
+				} else {
+					temp_speed_y = 0;
+				}
+			} else {
+				temp_speed_y = 0;
+			}
+		} else {
+			// check if hit side of screen
+			temp_speed_y = 0;
+			//
+			if(enemy_active) {
+				if((enemy_speed_x > 0 && enemy.x >= 800) || (enemy_speed_x < 0 && enemy.x <= 0)) 
+					temp_speed_x *= -1;
+			} 
+		}
+				   			   
+		// change scale and set x
+		if((enemy_speed_x < 0 && enemy.scale.x > 0) || (enemy_speed_x > 0 && enemy.scale.x < 0))
+			enemy.scale.x *= -1;
+
+		// move x
+		enemy.x += temp_speed_x;
+		enemy.y += temp_speed_y;
+		
+		// change x speed
+		if(temp_speed_x && temp_speed_x != enemy_speed_x) enemy_speed_x = temp_speed_x;
+		if(temp_speed_y != enemy_speed_y) enemy_speed_y = temp_speed_y;		
+	}
+	
+	// create an new instance of a pixi stage
+	var stage = new PIXI.Stage(0x00ccff);
+	
+	// sprites
+	var title1 = 0;
+	var title2 = 0;
+	var title3 = 0;
+	var player = 0;
+	var background = 0;
+	var enemy  = 0;
+	var time_bar = 0;
+	var time_bar_filler = 0;
+	
+	// animation(new)
+	var frame_timer = 0;
+	// enemy animation
+	var enemy_frame_speed = 10;
+	var enemy_frame_number = 0;
+	var enemy_max_frame_number = 2;
+	var enemy_frames = [];
+	var enemy_images = ["anim_bullyfish_0.png","anim_bullyfish_1.png","anim_bullyfish_2.png"];
+	// player animation
+	var player_frame_speed = 10; // disabled
+	var player_frame_number = 0;
+	var player_max_frame_number = 2;
+	var player_frames = [];
+	var player_images = ["anim_bobfish_0.png","anim_bobfish_1.png","anim_bobfish_2.png"];
+	
+	// text
+	var text1 = 0;
+	var text2 = 0;
+	var timer_text = 0;
+	
+	// create a renderer instance
+	var renderer = PIXI.autoDetectRenderer(800, 600);
+	
+	// add the renderer view element to the DOM
+	document.body.appendChild(renderer.view);
+	
+	var assetsToLoad = ["BobBobFish.json"];
+	
+	loader = new PIXI.AssetLoader(assetsToLoad);
+	loader.onComplete = loaded
+	loader.load();
+	
+	function loaded() {
+		background = new PIXI.Sprite.fromFrame("background.png");
+		player = new PIXI.Sprite.fromFrame("fish.png");
+		flake  = new PIXI.Sprite.fromFrame("flake.png");
+		
+		// player frames
+		for(i = 0; i < 3; i++) {
+			var image_name = player_images[i];
+			var player_frame = new PIXI.Sprite.fromFrame(image_name);
+			player_frames.push(player_frame);
+		}
+		player = player_frames[0];
+		
+		// enemy frames
+		for(i = 0; i < 3; i++) {
+			var image_name = enemy_images[i];
+			var enemy_frame = new PIXI.Sprite.fromFrame(image_name);
+			enemy_frames.push(enemy_frame);
+			console.log(enemy_frames);
+		}
+		enemy = enemy_frames[0];
+		
+		title1 = new PIXI.Sprite.fromFrame("bob_title.png");
+		title2 = new PIXI.Sprite.fromFrame("bob_title.png");
+		title3 = new PIXI.Sprite.fromFrame("fish_title.png");
+		time_bar = new PIXI.Sprite.fromFrame("time_bar.png");
+		time_bar_filler = new PIXI.Sprite.fromFrame("time_bar_filler.png");
+		text1  = new PIXI.Text("",{fill: "white", font: "bold 24px Arial", dropShadow: true, dropShadowDistance: 2});
+		text2  = new PIXI.Text("",{fill: "white", font: "bold 24px Arial", dropShadow: true, dropShadowDistance: 2});
+		text3  = new PIXI.Text("",{fill: "white", font: "bold 24px Arial", dropShadow: true, dropShadowDistance: 2});
+		timer_text = new PIXI.Text("",{fill: "white", font: "bold 36px Arial", dropShadow: true, dropShadowDistance: 2});
+		
+		// loading text
+		addText(text1,"Loading...",0.5,0.5,400,300);
+					
+		//gameCurrentState = gameState.gameIntro;
+		requestAnimFrame( animate );
+	}
+	
+	var loaded_pop = false;
+	var loaded_bgm = false;
+	var loaded_die = false;
+	
+	var pop = new Howl({
+		urls: ["pop.wav"],
+		onload: function () {
+			loaded_pop = true;
+		}
+	});
+	
+	var bgm = new Howl({
+		urls: ["bgm.mp3"],
+		loop: true,
+		onload: function () {
+			loaded_bgm = true;
+		}
+	});
+	
+	var die = new Howl({
+		urls: ["die.wav"],
+		onload: function () {
+			loaded_die = true;
+		}
+	});
+	
+	var check_x = 2;
+	var check_y = 2;
+	
+	var timer = 0;
+	
+	function manage_states() {
+		 if(gameCurrentState == gameState.loading) {
+		 	if(loaded_pop == true && loaded_bgm == true && loaded_die == true) {
+		 		stage.removeChild(text1);
+		 		
+		 		// background
+				addSprite(background,0.5,0.5,400,300);
+		 		
+		 		gameCurrentState = gameState.gameIntro;
+		 	}	
+		 }
+		 else if(gameCurrentState == gameState.gameIntro) {
+		 	
+		 	if(timer == 60) {
+				// center the sprites anchor point
+				pop.play();
+				addSprite(title1,0.5,0.5,200,200,0,0);
+			}
+			
+			if(timer == 75) {
+				// center the sprites anchor point
+				pop.play();
+				addSprite(title2,0.5,0.5,400,200,0,0);
+			}
+			
+			if(timer == 90) {
+				// center the sprites anchor point
+				pop.play();
+				addSprite(title3,0.5,0.5,600,200,0,0);
+				addText(text1,"Use the arrow keys to move",0.5,0.5,400,400);
+				addText(text2,"Press [Enter] to start",0.5,0.5,400,450);
+				gameCurrentState = gameState.gameMenu;
+			}
+		 	
+		 	timer += 1;
+		 	
+		 } else if(gameCurrentState == gameState.gameStarting) {
+		 	stage.removeChild(title1);
+			stage.removeChild(title2);
+			stage.removeChild(title3);
+			stage.removeChild(text1);
+			stage.removeChild(text2);
+			
+			// timer start
+			addText(timer_text,game_timer_max,0.5,0.5,50,50);
+			
+			// timer bar
+			addSprite(time_bar,0.5,0.5,50,300);
+			
+			// timer bar filler
+			addSprite(time_bar_filler,0.5,1,60,495,0,390);
+	
+			// center the sprites anchor point
+			addSprite(player,0.5,0.5,200,150,0,0);
+			
+			// flakes
+			addSprite(flake,0.5,0.5,400,300,0,0);
+			
+			game_timer = game_timer_max;
+			
+			bgm.play();
+			
+			gameCurrentState = gameState.gameRunning;
+			
+		} else if(gameCurrentState == gameState.gameRunning) {
+			// keyboard events
+			kd.tick();
+		
+			// key input
+			check_moving();
+		
+			// collisions
+			check_flake_eaten();
+			check_enemy_collision();
+			check_walls();
+			
+			// timer
+			check_timer();
+		
+			// direction of sprite
+			if(move_x > 0 && player.scale.x < 0) {
+				player.scale.x *= -1;
+			} 
+			if(move_x < 0 && player.scale.x > 0) {
+				player.scale.x *= -1;
+			}
+		
+			// move x
+			player.x += move_x;
+			// move y
+			player.y += move_y;
+			
+			// new enemy?
+			add_enemy();
+			activate_enemy();
+			deactivate_enemy();
+			remove_enemy();
+			move_enemy();
+			
+		} else if(gameCurrentState == gameState.gameEnding) {
+			timer += 1;
+			if(timer >= 180) {
+				timer = 0;
+				gameCurrentState = gameState.gameOver;
+			}
+		
+			drift_up();
+			check_walls();
+			
+			if(move_y < 0 && player.scale.y > 0) {
+				player.scale.y *= -1;
+			}
+			
+			// move x
+			player.x += move_x;
+			// move y
+			player.y += move_y;
+			
+			deactivate_enemy();
+			remove_enemy();
+			move_enemy();
+			
+		} else if(gameCurrentState == gameState.gameOver) {
+			if(!text1.stage) {
+				var str = Math.round(Math.abs(player.scale.x) * 100) / 100;
+				//
+				addText(text1,"GAME OVER",0.5,0.5,400,200);
+				addText(text2,"Bob Bob grew to " + str + "cm",0.5,0.5,400,250);
+				addText(text3,"Press [Enter] to restart",0.5,0.5,400,300);
+			}
+		
+			drift_up();
+			check_walls();
+			
+			if(move_y < 0 && player.scale.y > 0) {
+				player.scale.y *= -1;
+			}
+			
+			// move x
+			player.x += move_x;
+			// move y
+			player.y += move_y;
+			
+			deactivate_enemy();
+			remove_enemy();
+			move_enemy();
+		}
+	}
+	
+	function animate() {
+		
+		// state startups
+		manage_states();
+  		
+  		// animate
+  		animate_sprites();
+		requestAnimFrame( animate );
+	
+	    // render the stage   
+	    renderer.render(stage);
+	}
+	
+	function addSprite(spriteObject,anchorX,anchorY,posX,posY,width,height) {
+		spriteObject.anchor.x = anchorX;
+		spriteObject.anchor.y = anchorY;
+		spriteObject.position.x = posX;
+		spriteObject.position.y = posY;
+		if(width > 0) spriteObject.width = width;
+		if(height > 0) spriteObject.height = height;
+		stage.addChild(spriteObject);
+	}
+	
+	function addText(textObject,text,anchorX,anchorY,posX,posY) {
+		textObject.setText(text);
+		textObject.anchor.x = anchorX;
+		textObject.anchor.y = anchorY;
+		textObject.position.x = posX;
+		textObject.position.y = posY;
+		stage.addChild(textObject);
+	}
+	
+	function spriteCollision(spriteObject1,spriteObject2) {
+		if(!spriteObject1.stage || !spriteObject2.stage) {
+			return false;
+		}
+	
+		// pixi sets width to negative when reversing direction
+		// set collisions to inner box
+		x1 = spriteObject1.position.x - (spriteObject1.anchor.x * spriteObject1.width) + 4;
+		w1 = spriteObject1.width - 8;
+		if(w1 < 0) {
+			w1 *= -1;
+			x1 -= w1;
+		}
+		y1 = spriteObject1.position.y - (spriteObject1.anchor.y * spriteObject1.height) + 4;
+		h1 = spriteObject1.height - 8;
+		
+		x2 = spriteObject2.position.x - (spriteObject2.anchor.x * spriteObject2.width) + 4;
+		w2 = spriteObject2.width - 8;
+		if(w2 < 0) {
+			w2 *= -1;
+			x2 -= w2;
+		}
+		y2 = spriteObject2.position.y - (spriteObject2.anchor.y * spriteObject2.height) + 4;
+		h2 = spriteObject2.height - 8;
+		
+		return !((x1 + w1) < x2 || (x2 + w2) < x1 || (y1 + h1) < y2 || (y2 + h2) < y1);
+	}
+	
+	function hyp(x,y) {
+		x = Math.abs(x);
+		y = Math.abs(y);
+	
+		var max = Math.max(x,y);
+		var min = Math.min(x,y);
+		
+		var r = min / max;
+		
+		return max * Math.sqrt(1 + (r * r));
+	}
+	
+	function numInRng(n1,n2,n3) {
+		if(n1 >= n2 && n1 <= n3) return true;
+		if(n1 <= n2 && n1 >= n3) return true;
+	}
+
+	</script>
+</body>
+</html>

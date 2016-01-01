@@ -1,0 +1,53 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+	<meta charset="UTF-8" />
+	<title>(WIP) Strategy Game - liamchessell.com</title>
+	<script src="phaser.min.js"></script>
+	<script src="phaser-state-transition.js"></script>
+	<script src="boot.js"></script>
+	<script src="preloader.js"></script>
+	<script src="mainmenu.js"></script>
+	<script src="credits.js"></script>
+	<script src="help.js"></script>
+	<script src="game.js"></script>
+
+	<script src="playerunit.js"></script>
+</head>
+<body style="background-color:#003300;">
+
+<div id="gameContainer"></div>
+
+<div id="gameInstructions" style="width:620px;margin:10px auto;background-color:#ffffff;padding:10px;">
+<h2>(WIP) Strategy Game</h2>
+<p>Created for #1GAM September 2015</p>
+<p>This game is still in a concept state and by no means complete!</p>
+<p>Two players can play locally on the same PC/Laptop</p>
+<p>Move a unit by selecting it and clicking on the movable blue squares that appear. Pressing [Enter] will end your turn.</p>
+<p>If you're in range with an enemy you can click on a unit on a red square to fight!</p>
+<p>Sandy terrain is slower than grassy terrain to move on.</p>
+<p>Last player standing wins!</p>
+</div>
+
+<script type="text/javascript">
+
+window.onload = function() {
+
+	// create game
+	var game = new Phaser.Game(640, 480, Phaser.AUTO, "gameContainer");
+	
+	// add states
+	game.state.add("Boot", BasicGame.Boot);
+	game.state.add("Preloader", BasicGame.Preloader);
+	game.state.add("MainMenu", BasicGame.MainMenu);
+	game.state.add("Game", BasicGame.Game);
+	
+	// start
+	game.state.start("Boot");
+	
+};
+
+</script>
+
+</body>
+</html>

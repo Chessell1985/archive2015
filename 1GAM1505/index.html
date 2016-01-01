@@ -1,0 +1,403 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <title>#1GAM MAY</title>
+        <style type="text/css">
+        	body {
+        		margin: 5px auto;
+        		width: 960px;
+        		height: 640px;
+        		background-color:#000000;
+        	}
+        </style>
+        <script src="phaser.min.js"></script>
+    </head>
+    <body>
+	
+    <script type="text/javascript">
+
+    window.onload = function() {
+    
+    	var BOARD_Y         = 80;
+    	var BOARD_X         = 352;
+    	var BLOCK_Y_SPACING = 48;
+    	var BLOCK_X_OFFSET  = BOARD_X + 8;
+    	var TOP_LINE        = BOARD_Y + BLOCK_Y_SPACING;
+    	var BOTTOM_LINE     = BOARD_Y + (9 * BLOCK_Y_SPACING);
+    	var FALL_RATE       = 15; 
+    	var FALL_DISTANCE   = BLOCK_Y_SPACING / 3;
+    	
+    	var word_1 = "TOY";;
+    	var word_2 = "GAME";
+    	var word_3 = "GREAT";
+    	
+    	var word_array = [word_1,reverse(word_1),word_2,reverse(word_2),word_3,reverse(word_3)];
+    	console.log("words: " + word_array);
+    	
+    	var all_words = word_1 + word_2 + word_3;
+    	var colours   = ["0","1","2","3"];
+    	var letters   = [];
+    	var letters2  = [];
+    	var lettercount = all_words.length;
+    	while(lettercount > 0) {
+    		var letter = all_words.substring(lettercount - 1,lettercount);
+    		letters.push(letter);
+    		lettercount--;
+    	}
+    	
+    	function reverse (string) {
+    		var new_string = "";
+    		var i = string.length;
+    		while(i > 0) {
+    			new_string += string.substring(i - 1,i);
+    			i--;
+    		}
+    		return new_string;
+    	}
+    
+    	var ticks = 0;
+        var board = 0;
+        
+        // block groups
+        var new_blocks     = 0;
+        var falling_blocks = 0;
+        var matched_blocks = 0;
+        var board_blocks   = 0;
+        
+        // key input
+        var pressed_enter = false;
+        var responded_to_enter = false;
+        var move_timer = 0;
+        
+        var game_over = false;
+        
+        var game = new Phaser.Game(960, 640, Phaser.AUTO, '', { preload: preload, create: create , update: update});
+        
+        function preload () {
+			game.load.atlasJSONHash('Textures','Textures.png','Textures.json');
+        }
+
+        function create () {
+			board = game.add.sprite(352,80,'Textures','game_board.png');
+            
+            board_blocks = game.add.group();
+            
+            // block groups
+            new_blocks     = game.add.group();
+            falling_blocks = game.add.group();
+            matched_blocks = game.add.group();
+        }
+        
+        function update () {
+        	if(game.input.keyboard.justReleased(Phaser.Keyboard.A)) {
+        		if(move_timer > 0) return;
+        		swap_columns_at(360,424);
+        	}
+        	if(game.input.keyboard.justReleased(Phaser.Keyboard.S)) {
+        		if(move_timer > 0) return;
+        		swap_columns_at(424,488);
+        	}
+        	if(game.input.keyboard.justReleased(Phaser.Keyboard.D)) {
+        		if(move_timer > 0) return;
+        		swap_columns_at(488,552);
+        	}
+        	if(move_timer > 0) {
+        		move_timer -= 1;
+        		return;
+        	}
+        	create_blocks();
+        	drop_new_blocks();
+        	drop_all_blocks();
+        	match_blocks();
+        	remove_blocks();
+        	dropped_blocks();	
+        }
+        
+        // functions for blocks
+        // - create blocks
+        // - drop blocks
+        // - match blocks
+        // - destroy blocks
+        
+        function create_blocks () {
+        	// exit if there are already new blocks
+        	if(new_blocks.length > 0) return;
+        	
+        	// exit if any falling blocks occupy top line
+        	var top_line_occupied = false;
+        	falling_blocks.forEach(function(falling_block){
+        		if(falling_block.y <= TOP_LINE && falling_block.anchor.x == 0) {
+        			top_line_occupied = true;
+        			return;
+        		}
+        	}, this);
+        	if(top_line_occupied) return;
+        	
+        	// add new blocks
+        	var stored_x      = 0;
+            var new_block_x   = 0;
+            for(i = 0; i < 2; i++) {
+            	// bag of letters
+        		if(letters2.length <= 0) letters2 = letters.slice(0);
+        		if(colours.length <= 0) colours = ["0","0","1","1","2","2","3","3"];
+        		
+            	do {
+            		new_block_x = BLOCK_X_OFFSET + (game.rnd.integerInRange(0,4) * 64);
+            	} while(new_block_x == stored_x);
+            	
+            	if(!stored_x) stored_x = new_block_x;
+            	
+            	var random = game.rnd.integerInRange(0,letters2.length - 1);
+            	var blocknum = game.rnd.integerInRange(0,colours.length - 1);
+            	
+            	var block_sprite = "block" + colours[blocknum] + ".png";
+            	
+            	var new_block = game.add.sprite(new_block_x,BOARD_Y,'Textures',block_sprite);
+            	var letter = game.add.text(24,24,letters2[random], {font:"bold 24px arial",align:"center", fill:"#ffffff"});
+            	letters2.splice(random,1);
+            	colours.splice(blocknum,1);
+            	letter.anchor.setTo(0.5,0.5);
+            	new_block.addChild(letter);
+            	
+            	new_blocks.add(new_block);
+            }	
+        }
+        
+        function drop_new_blocks () {
+        	// exit if no new blocks
+        	if(new_blocks.length <= 0) return;
+        	
+        	// exit if there are falling blocks
+        	if(falling_blocks.length > 0) return;
+        	
+        	// exit if board blocks occupy next space
+        	var occupied = false;
+        	new_blocks.forEach(function(new_block){
+				// check next space is free
+				board_blocks.forEach(function(board_block){
+					if(new_block.y + BLOCK_Y_SPACING == board_block.y
+					&& new_block.x == board_block.x) {
+						occupied = true;
+					}
+				}, this);
+				if(occupied) return;
+			}, this);
+			if(occupied) return;
+				
+        	
+        	// add to falling blocks
+        	do {
+        		falling_blocks.add(new_blocks.getAt(0));
+        	} while(new_blocks.length > 0);	
+        }
+        
+        function drop_all_blocks () {
+        	// exit if no falling blocks
+        	if(falling_blocks.length <= 0) return;
+        	
+        	// drop blocks
+        	ticks++;
+        	if(ticks >= 60) ticks = 0;
+        	if(ticks % FALL_RATE == 0) {
+        		falling_blocks.forEach(function(falling_block){
+        			// check next space is free
+        			if((falling_block.y - BOARD_Y) % BLOCK_Y_SPACING == 0) {
+        				if(falling_block.y + BLOCK_Y_SPACING == BOTTOM_LINE) return;
+        				if(board_blocks.length > 0) {
+        					var occupied = false;
+        					board_blocks.forEach(function(board_block){
+        						if(falling_block.y + BLOCK_Y_SPACING == board_block.y
+        						&& falling_block.x == board_block.x) {
+        							occupied = true;
+        						}
+        					}, this);
+        					if(occupied) return;
+        				}	
+        			}
+        			
+        			falling_block.y += FALL_DISTANCE;
+        			falling_block.children.forEach(function(child){
+        				child.y -= FALL_DISTANCE;
+        			}, this);
+        		}, this);	
+        	}
+        }
+        
+        function dropped_blocks () {
+        	// exit if no falling blocks
+        	if(falling_blocks.length <= 0) return;
+        	
+        	// finished dropping blocks
+        	var blocks = [];
+        	falling_blocks.forEach(function(falling_block){
+        		if(falling_block.y + BLOCK_Y_SPACING == BOTTOM_LINE) {
+        			blocks.push(falling_block);
+        		}
+        		var occupied = false;
+        		if(board_blocks.length > 0) {
+        			board_blocks.forEach(function(board_block){
+						if(falling_block.y + BLOCK_Y_SPACING == board_block.y
+						&& falling_block.x == board_block.x) {
+							occupied = true;
+						}
+					}, this);
+					if(occupied) blocks.push(falling_block);
+        		}		
+        	}, this);
+        	
+        	for(i = 0; i < blocks.length; i++) {
+        		board_blocks.add(blocks[i]);
+        	}
+        }
+        
+        function match_blocks () {
+        	// exit if no falling blocks
+        	if(falling_blocks.length <= 0) return;
+        	
+        	// exit if no dropped blocks
+        	if(board_blocks.length <= 0) return;
+        	
+        	var blocks = [];
+        	// match blocks by colour
+        	falling_blocks.forEach(function(falling_block) {
+        		if((falling_block.y - board.y) % BLOCK_Y_SPACING == 0) {
+        			board_blocks.forEach(function(board_block) {
+        				if(board_block.x == falling_block.x 
+        				&& (falling_block.y + BLOCK_Y_SPACING) == board_block.y
+        				&& falling_block.frame == board_block.frame) {
+        					blocks.push(board_block);
+        					blocks.push(falling_block);
+        				}
+        			}, this);
+        		}
+        	}, this);
+        	
+        	// match blocks by words
+        	falling_blocks.forEach(function(falling_block) {
+        		if((falling_block.y - board.y) % BLOCK_Y_SPACING == 0) {
+					var sortblocks = [];
+					board_blocks.forEach(function(board_block) {
+						if(falling_block.x == board_block.x) {
+							sortblocks.push(board_block);		
+						}
+						if(falling_block.x == board_block.x
+						&& (falling_block.y + BLOCK_Y_SPACING) == board_block.y) {
+							sortblocks.push(falling_block);
+						}
+					}, this)
+					if(sortblocks.length > 1) {
+						sortblocks.sort(function(a,b) {return a.y - b.y});
+						var string = "";
+						sortblocks[0].children.forEach(function(child) {string += child.text;}, this)
+						for(i = 1; i < sortblocks.length; i++) {
+							if(sortblocks[i - 1].x == sortblocks[i].x
+							&& (sortblocks[i - 1].y + BLOCK_Y_SPACING) === sortblocks[i].y) {
+								sortblocks[i].children.forEach(function(child) {string += child.text;}, this);
+								for(j = 0; j < word_array.length; j++) {
+									if(string == word_array[j]) {
+										for(k = 0; k < word_array[j].length; k++) {
+											blocks.push(sortblocks[k]);
+										}
+									}
+								}
+							}			
+						}
+					}
+				}	
+			}, this);
+        	
+        	/*
+        	// match blocks by words
+        	falling_blocks.forEach(function(falling_block) {
+				var string = "";
+				falling_block.children.forEach(function(child) {string += child.text;}, this);
+				board_blocks.forEach(function(board_block) {
+					if(falling_block.x == board_block.x
+					&& (falling_block.y + BLOCK_Y_SPACING) == board_block.y) {
+						board_block.children.forEach(function(child) {string += child.text;}, this);
+						for(i = 0; i < word_array.length; i++) {
+							if(string == word_array[i]) {
+								blocks.push(board_block);
+								blocks.push(falling_block);
+							}
+						}
+					}
+				}, this)	
+			}, this);
+        	*/
+        	
+        	for(i = 0; i < blocks.length; i++) {
+        		matched_blocks.add(blocks[i]);
+        	}
+        	
+        }
+        
+        function remove_blocks () {
+        	// exit if no matched blocks
+        	if(matched_blocks.length <= 0) return;
+        	
+        	// remove blocks
+        	do {
+        		matched_blocks.getAt(0).destroy(true);
+        	} while(matched_blocks.length > 0)
+        }
+        
+        function swap_columns_at (col1, col2) {
+        	move_timer = 10; 
+        	var move_milliseconds = Math.floor(move_timer / 60 * 1000);
+        	// swap falling blocks if lower than top of other column
+        	falling_blocks.forEach(function(falling_block) {
+        		if(falling_block.x == col1) {
+        			var must_move = false;
+        			board_blocks.forEach(function(board_block) {
+        				if(board_block.x == col2 && board_block.y <= (falling_block.y + BLOCK_Y_SPACING)) {
+        					must_move = true;
+        					return;
+        				}
+        			}, this);
+        			if(must_move) {
+        				var tween = game.add.tween(falling_block);
+        			
+						tween.to({ x: col2 }, move_milliseconds,Phaser.Easing.Linear.None,false,false,0,false);
+						tween.start();
+        			}
+        		}
+        		if(falling_block.x == col2) {
+        			var must_move = false;
+        			board_blocks.forEach(function(board_block) {
+        				if(board_block.x == col1 && board_block.y <= (falling_block.y + BLOCK_Y_SPACING)) {
+        					must_move = true;
+        					return;
+        				}
+        			}, this);
+        			if(must_move) {
+        				var tween = game.add.tween(falling_block);
+        			
+						tween.to({ x: col1 }, move_milliseconds,Phaser.Easing.Linear.None,false,false,0,false);
+						tween.start();
+        			}
+        		}	
+        	}, this);
+        	// swap board blocks
+        	board_blocks.forEach(function(board_block) {
+        		if(board_block.x == col1) {
+        			var tween = game.add.tween(board_block);
+        			
+        			tween.to({ x: col2 }, move_milliseconds,Phaser.Easing.Linear.None,false,false,0,false);
+        			tween.start();	
+        		}
+        		if(board_block.x == col2) {
+        			var tween = game.add.tween(board_block);
+        			
+        			tween.to({ x: col1 }, move_milliseconds,Phaser.Easing.Linear.None,false,false,0,false);
+        			tween.start();
+        		}
+        	}, this);		
+        }
+    };
+
+    </script>
+
+    </body>
+</html>
